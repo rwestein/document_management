@@ -1,3 +1,12 @@
+#-----------------------------------------------------------------------------
+# Document Archiver
+# This tool just moves scanned or saved .pdf documents into the right folder
+# Input: documents residing in the "Inbox" folder of a cloud service
+# Result: documents moved to the right year-related folder under "Documents"
+# Assumption: Documents are post-fixed with a yyyymmdd based date, optionally
+# followed by a sequence letter (a, b, c, ...)
+#-----------------------------------------------------------------------------
+
 import os
 import pathlib
 import re
