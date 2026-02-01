@@ -11,18 +11,27 @@ import os
 import pathlib
 import re
 import shutil
+import sys
+from enum import Enum
+
+# class syntax
+class Verbosity(Enum):
+    SILENT = 0
+    WHEN_NOT_MOVED = 1
+    ALL = 2
 
 
 class DocumentArchiver:
     CLOUD_DIRECTORY = ''
     INBOX_DIRECTORY = CLOUD_DIRECTORY+'/Inbox'
     DOC_DIRECTORY = CLOUD_DIRECTORY+'/Documents'
-    verbose = True
+    verbose = Verbosity.SILENT
     actions = []
+    destination_counts = {}
     files = []
     existing_files = []
 
-    def __init__(self, cloud_dir=pathlib.Path.home(), verbose=True):
+    def __init__(self, cloud_dir=pathlib.Path.home(), verbose=Verbosity.WHEN_NOT_MOVED):
         self.CLOUD_DIRECTORY = str(cloud_dir)
         self.INBOX_DIRECTORY = self.CLOUD_DIRECTORY + '/Inbox'
         self.DOC_DIRECTORY = self.CLOUD_DIRECTORY + '/Documents'
@@ -81,9 +90,18 @@ class DocumentArchiver:
         return os.path.join(self.DOC_DIRECTORY, year, self.determine_new_name(doc))
 
     def log(self, text):
-        if self.verbose:
+        if self.verbose == Verbosity.ALL:
+            print(text)
+        elif self.verbose == Verbosity.WHEN_NOT_MOVED and not text.startswith('Move'):
             print(text)
         self.actions.append(text)
+
+    def log_destination(self, doc):
+        year = self.determine_year(doc)
+        if year in self.destination_counts:
+            self.destination_counts[year] += 1
+        else:
+            self.destination_counts[year] = 1
 
     def simulate(self, max=None):
         return self.move(max=max, simulate=True)
@@ -92,6 +110,12 @@ class DocumentArchiver:
         if dest.replace(self.CLOUD_DIRECTORY, '...') in self.existing_files:
             return True
         return os.path.isfile(dest)
+
+    def create_destination_report(self):
+        report_lines = []
+        for year, count in sorted(self.destination_counts.items()):
+            report_lines.append(f'Moved {count} file{"s" if count > 1 else ""} to {year}')
+        return '\n'.join(report_lines)
 
     def move(self, max=None, simulate=False):
         movements_done = 0
@@ -116,11 +140,17 @@ class DocumentArchiver:
                     if not simulate:
                         shutil.move(self.INBOX_DIRECTORY+os.sep+orig_doc, dest)
                     self.log(f'Move "{orig_doc}" to "{dest.replace(self.CLOUD_DIRECTORY, "...")}"')
+                    self.log_destination(new_doc)
                     movements_done += 1
+        if self.verbose != Verbosity.SILENT:
+            print(self.create_destination_report())
         return self.actions
 
 
 if __name__ == '__main__':
+    if 'test' in sys.argv:
+        print('use "python test_archive.py" to run tests')
+        sys.exit(0)
     dropbox = pathlib.Path.home() / 'Dropbox'
     da = DocumentArchiver(dropbox)
     da.move()
